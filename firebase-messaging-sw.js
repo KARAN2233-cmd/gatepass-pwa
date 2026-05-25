@@ -12,12 +12,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey            : "AIzaSyDbX44eylIbr2Fa9gRv7W5cJB0rWCvJ0W4",
-  authDomain        : "ajmergatepass.firebaseapp.com",
-  projectId         : "ajmergatepass",
-  storageBucket     : "ajmergatepass.firebasestorage.app",
-  messagingSenderId : "704734310536",
-  appId             : "1:704734310536:web:5e9f46249c062077012f3d"
+  apiKey            : import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain        : import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId         : import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket     : import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId : import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId             : import.meta.env.VITE_FIREBASE_APP_ID
 });
 
 const messaging = firebase.messaging();
