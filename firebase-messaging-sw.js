@@ -1,24 +1,62 @@
+// firebase-messaging-sw.js
+// ✅ This file MUST be at the root of your GitHub Pages site
+//    (same folder as index.html, NOT inside a subfolder)
+//
+//    For a repo named "gatepass-pwa" deployed to GitHub Pages:
+//    https://<you>.github.io/gatepass-pwa/firebase-messaging-sw.js  ← CORRECT
+//
+//    If your repo is deployed from /docs or a branch root,
+//    place this file there.
+
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyDbX44eylIbr2Fa9gRv7W5cJB0rWCvJ0W4",
-  authDomain: "ajmergatepass.firebaseapp.com",
-  projectId: "ajmergatepass",
-  storageBucket: "ajmergatepass.firebasestorage.app",
-  messagingSenderId: "704734310536",
-  appId: "1:704734310536:web:5e9f46249c062077012f3d"
+  apiKey            : "AIzaSyDbX44eylIbr2Fa9gRv7W5cJB0rWCvJ0W4",
+  authDomain        : "ajmergatepass.firebaseapp.com",
+  projectId         : "ajmergatepass",
+  storageBucket     : "ajmergatepass.firebasestorage.app",
+  messagingSenderId : "704734310536",
+  appId             : "1:704734310536:web:5e9f46249c062077012f3d"
 });
 
 const messaging = firebase.messaging();
 
+// ── Background / closed-app notifications ─────────────
 messaging.onBackgroundMessage(function(payload) {
-  const n = payload.notification;
-  self.registration.showNotification(n.title, {
-    body  : n.body,
-    icon  : '/gatepass-pwa/icon.png',
-    badge : '/gatepass-pwa/icon.png',
-    vibrate: [200, 100, 200],
-    requireInteraction: true
-  });
+  console.log('[SW] Background message:', payload);
+
+  const notification = payload.notification || {};
+  const title  = notification.title || 'Gate Pass Alert';
+  const body   = notification.body  || '';
+
+  const options = {
+    body              : body,
+    icon              : 'icon.png',      // must exist in same folder
+    badge             : 'icon.png',
+    vibrate           : [200, 100, 200, 100, 200],
+    requireInteraction: true,            // stays until dismissed on Android
+    tag               : 'gate-pass',     // replaces previous notification instead of stacking
+    data              : payload.data || {}
+  };
+
+  return self.registration.showNotification(title, options);
+});
+
+// ── Notification click → open/focus the app ───────────
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // No existing window — open a new one
+      if (clients.openWindow) {
+        return clients.openWindow('./');
+      }
+    })
+  );
 });
