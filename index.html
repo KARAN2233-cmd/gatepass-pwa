@@ -122,11 +122,8 @@
         return;
       }
 
-      showStatus("info", "Saving token…");
-// REPLACE WITH THIS
-await fetch(
-  SAVE_TOKEN_URL + "?action=saveToken&role=" + role + "&token=" + encodeURIComponent(token),
-  { mode: 'no-cors' }
+showStatus("success", "✅ Done! You will now receive gate pass notifications on this device.");
+btn.textContent = "✅ Notifications Active";
 );
 
 // no-cors means we can't read the response, but the request DOES go through
