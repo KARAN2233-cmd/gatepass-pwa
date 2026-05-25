@@ -2,12 +2,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey            : "YOUR_API_KEY",
-  authDomain        : "YOUR_PROJECT.firebaseapp.com",
-  projectId         : "YOUR_PROJECT_ID",
-  storageBucket     : "YOUR_PROJECT.appspot.com",
-  messagingSenderId : "YOUR_SENDER_ID",
-  appId             : "YOUR_APP_ID"
+  apiKey: "AIzaSyDbX44eylIbr2Fa9gRv7W5cJB0rWCvJ0W4",
+  authDomain: "ajmergatepass.firebaseapp.com",
+  projectId: "ajmergatepass",
+  storageBucket: "ajmergatepass.firebasestorage.app",
+  messagingSenderId: "704734310536",
+  appId: "1:704734310536:web:5e9f46249c062077012f3d"
 });
 
 const messaging = firebase.messaging();
