@@ -15,7 +15,7 @@
     }
     .card {
       background: #13161e; border: 1px solid #242836;
-      border-radius: 16px; padding: 36px; max-width: 400px;
+      border-radius: 16px; padding: 36px; max-width: 420px;
       width: 100%; text-align: center;
     }
     .icon { font-size: 52px; margin-bottom: 16px; }
@@ -25,20 +25,37 @@
       background: #f0a500; color: #000; border: none;
       border-radius: 10px; padding: 14px 28px;
       font-size: 15px; font-weight: 700; cursor: pointer;
-      width: 100%; margin-bottom: 12px;
+      width: 100%; margin-bottom: 12px; transition: background .2s;
     }
+    .btn:hover:not(:disabled) { background: #ffb829; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
     .status {
       margin-top: 16px; padding: 12px 16px;
       border-radius: 8px; font-size: 13px; display: none;
+      text-align: left; line-height: 1.5;
     }
     .success { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
     .error   { background: rgba(239,68,68,.15);  color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
     .info    { background: rgba(59,130,246,.15); color: #3b82f6; border: 1px solid rgba(59,130,246,.3); }
+    .warn    { background: rgba(240,165,0,.15);  color: #f0a500; border: 1px solid rgba(240,165,0,.3); }
     select {
       width: 100%; padding: 12px 14px; margin-bottom: 12px;
       background: #1a1e29; border: 1px solid #242836;
       border-radius: 8px; color: #e8eaf0; font-size: 14px;
+      cursor: pointer;
+    }
+    select option { background: #1a1e29; }
+    .ios-note {
+      margin-top: 12px; padding: 12px 14px;
+      background: rgba(240,165,0,.08); border: 1px solid rgba(240,165,0,.2);
+      border-radius: 8px; font-size: 12px; color: #f0a500;
+      text-align: left; line-height: 1.6; display: none;
+    }
+    .divider { border: none; border-top: 1px solid #242836; margin: 20px 0; }
+    .platform-badge {
+      display: inline-block; background: #1a1e29; border: 1px solid #242836;
+      border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #6b7280;
+      margin-bottom: 16px;
     }
   </style>
 </head>
@@ -46,7 +63,15 @@
 <div class="card">
   <div class="icon">🏭</div>
   <h1>Gate Pass Alerts</h1>
+  <div class="platform-badge" id="platform-badge">Detecting platform…</div>
   <p>Select your role and enable notifications to receive instant gate pass alerts.</p>
+
+  <!-- iOS install hint (shown only on iOS if not installed) -->
+  <div class="ios-note" id="ios-note">
+    📱 <strong>iPhone / iPad users:</strong> You must first
+    <strong>Add to Home Screen</strong> before enabling notifications.<br>
+    Tap the Share button <strong>⎋</strong> → <em>Add to Home Screen</em> → then reopen the app and tap Enable.
+  </div>
 
   <select id="role-select">
     <option value="">-- Select Your Role --</option>
@@ -61,97 +86,182 @@
   <div class="status" id="status-box"></div>
 </div>
 
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 
 <script>
-  // ── FILL THESE VALUES ─────────────────────────────────
-  const firebaseConfig = {
-  apiKey: "AIzaSyDbX44eylIbr2Fa9gRv7W5cJB0rWCvJ0W4",
-  authDomain: "ajmergatepass.firebaseapp.com",
-  projectId: "ajmergatepass",
-  storageBucket: "ajmergatepass.firebasestorage.app",
-  messagingSenderId: "704734310536",
-  appId: "1:704734310536:web:5e9f46249c062077012f3d"
-  };
-  const VAPID_KEY      = "BGHA4erBE--LuTnXLdlBkmdus4ki6Ztkqxpo7zGzAyYJoxjNpaKIu-dHpa6HlZZQw0_hc_2KXKIrkGCVPZIGJgs";
-  const SAVE_TOKEN_URL = "https://script.google.com/macros/s/AKfycbw19yXGawxz5HzznmRHNFeNch_-sZumDZZwRoTXElr4yS_hvd7y6PeU_WmL8QGy2sXx/exec";
-  // ─────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey            : "AIzaSyDbX44eylIbr2Fa9gRv7W5cJB0rWCvJ0W4",
+  authDomain        : "ajmergatepass.firebaseapp.com",
+  projectId         : "ajmergatepass",
+  storageBucket     : "ajmergatepass.firebasestorage.app",
+  messagingSenderId : "704734310536",
+  appId             : "1:704734310536:web:5e9f46249c062077012f3d"
+};
+const VAPID_KEY      = "BGHA4erBE--LuTnXLdlBkmdus4ki6Ztkqxpo7zGzAyYJoxjNpaKIu-dHpa6HlZZQw0_hc_2KXKIrkGCVPZIGJgs";
+// ✅ Your Google Apps Script URL for saving tokens
+const SAVE_TOKEN_URL = "https://script.google.com/macros/s/AKfycbw19yXGawxz5HzznmRHNFeNch_-sZumDZZwRoTXElr4yS_hvd7y6PeU_WmL8QGy2sXx/exec";
 
-  firebase.initializeApp(firebaseConfig);
-  const messaging = firebase.messaging();
+// ── Detect Platform ───────────────────────────────────
+const ua         = navigator.userAgent;
+const isIOS      = /iphone|ipad|ipod/i.test(ua);
+const isAndroid  = /android/i.test(ua);
+const isSafari   = /^((?!chrome|android).)*safari/i.test(ua);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                  || window.navigator.standalone === true;
 
-  // Register service worker from same origin
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker
-      .register('/gatepass-pwa/firebase-messaging-sw.js')
-      .then(reg => console.log('SW registered', reg))
-      .catch(err => console.error('SW error', err));
+document.getElementById("platform-badge").textContent =
+  isIOS     ? (isStandalone ? "iOS — Installed ✓" : "iOS Safari")
+  : isAndroid ? "Android"
+  : "Desktop / Windows";
+
+// Show iOS install note if on iOS and NOT in standalone mode
+if (isIOS && !isStandalone) {
+  document.getElementById("ios-note").style.display = "block";
+}
+
+// ── Check Notification API support ───────────────────
+if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+  document.getElementById("enable-btn").disabled = true;
+  showStatus("error",
+    isIOS && !isStandalone
+      ? "❌ Notifications require this page to be installed as an app. See the blue box above."
+      : "❌ Push notifications are not supported on this browser."
+  );
+}
+
+// ── Init Firebase ─────────────────────────────────────
+firebase.initializeApp(FIREBASE_CONFIG);
+const messaging = firebase.messaging();
+
+// ── Register Service Worker ───────────────────────────
+// The SW file must be at the ROOT of scope. For GitHub Pages this is
+// https://<user>.github.io/<repo>/firebase-messaging-sw.js
+// Adjust the path if your repo name differs.
+let swRegistration = null;
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register("firebase-messaging-sw.js")   // ← same folder as index.html
+    .then(reg => {
+      swRegistration = reg;
+      console.log("✅ SW registered:", reg.scope);
+    })
+    .catch(err => {
+      console.error("❌ SW registration failed:", err);
+      showStatus("error", "❌ Service Worker failed: " + err.message);
+    });
+}
+
+// ── Main: Enable Notifications ────────────────────────
+async function enableNotifications() {
+  const btn  = document.getElementById("enable-btn");
+  const role = document.getElementById("role-select").value;
+
+  if (!role) {
+    showStatus("error", "❌ Please select your role first.");
+    return;
   }
 
-  async function enableNotifications() {
-    const btn    = document.getElementById("enable-btn");
-    const role   = document.getElementById("role-select").value;
+  // iOS must be installed first
+  if (isIOS && !isStandalone) {
+    showStatus("warn",
+      "📱 Please add this page to your Home Screen first, then reopen and tap Enable."
+    );
+    return;
+  }
 
-    if (!role) {
-      showStatus("error", "❌ Please select your role first.");
+  btn.disabled    = true;
+  btn.textContent = "Setting up…";
+  showStatus("info", "⏳ Requesting notification permission…");
+
+  try {
+    // 1️⃣  Request permission
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      showStatus("error",
+        "❌ Permission denied.\n\n" +
+        "Android: Tap the 🔒 icon in the address bar → Site Settings → Notifications → Allow.\n" +
+        "iPhone: Settings → Safari → [this site] → Notifications → Allow."
+      );
+      btn.disabled    = false;
+      btn.textContent = "🔔 Enable Notifications";
       return;
     }
 
-    btn.disabled = true;
-    btn.textContent = "Setting up…";
-    showStatus("info", "Requesting permission…");
+    showStatus("info", "⏳ Waiting for service worker…");
 
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        showStatus("error", "❌ Permission denied. Tap the 🔒 icon in address bar → Allow Notifications.");
-        btn.disabled = false;
-        btn.textContent = "🔔 Enable Notifications";
-        return;
-      }
+    // 2️⃣  Wait for SW to be ready
+    const swReg = await navigator.serviceWorker.ready;
 
-      showStatus("info", "Getting device token…");
-      const swReg  = await navigator.serviceWorker.ready;
-      const token  = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    showStatus("info", "⏳ Getting device token from Firebase…");
 
-      if (!token) {
-        showStatus("error", "❌ Token failed. Make sure you are on HTTPS.");
-        btn.disabled = false;
-        btn.textContent = "🔔 Enable Notifications";
-        return;
-      }
+    // 3️⃣  Get FCM token
+    const token = await messaging.getToken({
+      vapidKey                  : VAPID_KEY,
+      serviceWorkerRegistration : swReg
+    });
 
-showStatus("success", "✅ Done! You will now receive gate pass notifications on this device.");
-btn.textContent = "✅ Notifications Active";
-);
-
-// no-cors means we can't read the response, but the request DOES go through
-// So we just trust it worked if no exception was thrown
-showStatus("success", "✅ Done! You will now receive gate pass notifications on this device.");
-btn.textContent = "✅ Notifications Active";
-
-    } catch(err) {
-      showStatus("error", "❌ " + err.message);
-      btn.disabled = false;
+    if (!token) {
+      showStatus("error", "❌ Could not get FCM token. Make sure the site is served over HTTPS.");
+      btn.disabled    = false;
       btn.textContent = "🔔 Enable Notifications";
+      return;
     }
-  }
 
-  function showStatus(type, msg) {
-    const el = document.getElementById("status-box");
-    el.className = "status " + type;
-    el.textContent = msg;
-    el.style.display = "block";
-  }
+    console.log("FCM token:", token);
+    showStatus("info", "⏳ Saving token to server…");
 
-  // Foreground notification
-  messaging.onMessage(payload => {
-    const n = payload.notification;
-    if (Notification.permission === "granted") {
-      new Notification(n.title, { body: n.body });
-    }
-  });
+    // 4️⃣  Save token to Google Apps Script
+    await saveToken(role, token);
+
+    showStatus("success", "✅ Done! You will now receive gate pass notifications on this device.");
+    btn.textContent = "✅ Notifications Active";
+    // Keep button disabled — already active
+
+  } catch (err) {
+    console.error(err);
+    showStatus("error", "❌ " + err.message);
+    btn.disabled    = false;
+    btn.textContent = "🔔 Enable Notifications";
+  }
+}
+
+// ── Save Token to GAS (no-cors safe via GET params) ───
+async function saveToken(role, token) {
+  const url = SAVE_TOKEN_URL +
+    "?action=saveToken" +
+    "&role="  + encodeURIComponent(role) +
+    "&token=" + encodeURIComponent(token);
+
+  // Using no-cors mode — we won't get a readable response, but the
+  // request DOES reach Google Apps Script and the data IS saved.
+  await fetch(url, { method: "GET", mode: "no-cors" });
+  console.log("Token save request sent for role:", role);
+}
+
+// ── Foreground notifications ──────────────────────────
+messaging.onMessage(payload => {
+  console.log("Foreground message:", payload);
+  const n = payload.notification;
+  if (Notification.permission === "granted" && n) {
+    new Notification(n.title, {
+      body  : n.body,
+      icon  : "icon.png",
+      badge : "icon.png"
+    });
+  }
+});
+
+// ── UI helper ─────────────────────────────────────────
+function showStatus(type, msg) {
+  const el = document.getElementById("status-box");
+  el.className          = "status " + type;
+  el.style.display      = "block";
+  el.style.whiteSpace   = "pre-line";   // supports \n in messages
+  el.textContent        = msg;
+}
 </script>
 </body>
 </html>
